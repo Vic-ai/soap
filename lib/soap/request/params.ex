@@ -38,7 +38,7 @@ defmodule Soap.Request.Params do
   @spec validate_params(params :: any(), wsdl :: map(), operation :: String.t()) :: any()
   def validate_params(params, _wsdl, _operation) when is_binary(params), do: params
 
-  def validate_params({_tag, _attrs, _nested} = param, wsdl, operation) do
+  def validate_params(param = {_tag, _attrs, _nested}, wsdl, operation) do
     case validate_param(param, wsdl, operation) do
       nil -> param
       error -> {:error, error}
@@ -133,18 +133,13 @@ defmodule Soap.Request.Params do
   end
 
   defp build_soap_header(wsdl, operation, headers) do
-    case headers |> construct_xml_request_header do
-      {:error, messages} ->
-        {:error, messages}
+    body =
+      headers
+      |> construct_xml_request_header
+      |> add_header_part_tag_wrapper(wsdl, operation)
+      |> add_header_tag_wrapper
 
-      validated_params ->
-        body =
-          validated_params
-          |> add_header_part_tag_wrapper(wsdl, operation)
-          |> add_header_tag_wrapper
-
-        {:ok, body}
-    end
+    {:ok, body}
   end
 
   defp type_error_message(k, type) do
@@ -181,9 +176,6 @@ defmodule Soap.Request.Params do
   defp construct_xml_request_header({tag, value}) do
     {to_string(tag), nil, construct_xml_request_header(value)}
   end
-
-  @spec insert_tag_parameters(params :: list()) :: list()
-  defp insert_tag_parameters(params) when is_list(params), do: params |> List.insert_at(1, nil)
 
   @spec construct_xml_request_header(params :: map() | list()) :: list()
   defp construct_xml_request_header(params) when is_map(params) or is_list(params) do
@@ -273,10 +265,10 @@ defmodule Soap.Request.Params do
   end
 
   @spec add_body_tag_wrapper(list()) :: list()
-  defp add_body_tag_wrapper(body), do: [element(:"#{env_namespace()}:Body", nil, body)]
+  defp add_body_tag_wrapper(body), do: [element("#{env_namespace()}:Body", nil, body)]
 
   @spec add_header_tag_wrapper(list()) :: list()
-  defp add_header_tag_wrapper(body), do: [element(:"#{env_namespace()}:Header", nil, body)]
+  defp add_header_tag_wrapper(body), do: [element("#{env_namespace()}:Header", nil, body)]
 
   @spec add_envelope_tag_wrapper(body :: any(), wsdl :: map(), operation :: String.t()) :: any()
   defp add_envelope_tag_wrapper(body, wsdl, operation) do
@@ -286,7 +278,7 @@ defmodule Soap.Request.Params do
       |> Map.merge(build_action_attribute(wsdl, operation))
       |> Map.merge(custom_namespaces())
 
-    [element(:"#{env_namespace()}:Envelope", envelop_attributes, body)]
+    [element("#{env_namespace()}:Envelope", envelop_attributes, body)]
   end
 
   @spec build_soap_version_attribute(map()) :: map()

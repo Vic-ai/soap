@@ -11,13 +11,16 @@ defmodule Soap.Wsdl do
 
   alias Soap.{Request, Type, Xsd}
 
-  @spec parse_from_file(String.t()) :: {:ok, map()}
+  @typep xml_element :: tuple()
+  @typep ns_prefix :: charlist() | atom()
+
+  @spec parse_from_file(String.t(), keyword()) :: {:ok, map()}
   def parse_from_file(path, opts \\ []) do
     {:ok, wsdl} = File.read(path)
     parse(wsdl, path, opts)
   end
 
-  @spec parse_from_url(String.t()) :: {:ok, map()}
+  @spec parse_from_url(String.t(), keyword()) :: {:ok, map()}
   def parse_from_url(path, opts \\ []) do
     request_opts = Keyword.merge([follow_redirect: true, max_redirect: 5], opts)
     %HTTPoison.Response{body: wsdl} = Request.get_http_client().get!(path, [], request_opts)
@@ -47,7 +50,7 @@ defmodule Soap.Wsdl do
     {:ok, parsed_response}
   end
 
-  @spec get_schema_namespace(String.t()) :: String.t()
+  @spec get_schema_namespace(xml_element()) :: ns_prefix()
   defp get_schema_namespace(wsdl) do
     {_, _, _, schema_namespace, _} =
       wsdl
@@ -57,14 +60,14 @@ defmodule Soap.Wsdl do
     schema_namespace
   end
 
-  @spec get_namespaces(String.t(), String.t(), String.t()) :: map()
+  @spec get_namespaces(xml_element(), ns_prefix(), ns_prefix()) :: map()
   defp get_namespaces(wsdl, schema_namespace, protocol_ns) do
     wsdl
     |> xpath(~x"//#{ns("definitions", protocol_ns)}/namespace::*"l)
     |> Enum.into(%{}, &get_namespace(&1, wsdl, schema_namespace, protocol_ns))
   end
 
-  @spec get_namespace(tuple(), String.t(), String.t(), String.t()) :: tuple()
+  @spec get_namespace(tuple(), xml_element(), ns_prefix(), ns_prefix()) :: tuple()
   defp get_namespace(namespaces_node, wsdl, schema_namespace, protocol_ns) do
     {_, _, _, key, value} = namespaces_node
     string_key = key |> to_string
@@ -87,7 +90,7 @@ defmodule Soap.Wsdl do
     end
   end
 
-  @spec get_endpoint(String.t(), String.t(), String.t()) :: String.t()
+  @spec get_endpoint(xml_element(), ns_prefix(), ns_prefix()) :: String.t()
   def get_endpoint(wsdl, protocol_ns, soap_ns) do
     wsdl
     |> xpath(
@@ -97,7 +100,7 @@ defmodule Soap.Wsdl do
     )
   end
 
-  @spec get_complex_types(String.t(), String.t(), String.t()) :: list()
+  @spec get_complex_types(xml_element(), ns_prefix(), ns_prefix()) :: list()
   defp get_complex_types(wsdl, namespace, protocol_ns) do
     xpath(
       wsdl,
@@ -107,7 +110,7 @@ defmodule Soap.Wsdl do
     )
   end
 
-  @spec get_validation_types(String.t(), String.t(), String.t(), String.t(), String.t(), keyword()) :: map()
+  @spec get_validation_types(xml_element(), String.t(), ns_prefix(), ns_prefix(), String.t(), keyword()) :: map()
   def get_validation_types(wsdl, file_path, protocol_ns, schema_ns, endpoint, opts \\ []) do
     Map.merge(
       Type.get_complex_types(
@@ -121,7 +124,7 @@ defmodule Soap.Wsdl do
     )
   end
 
-  @spec get_schema_imports(String.t(), String.t(), String.t()) :: list()
+  @spec get_schema_imports(xml_element(), ns_prefix(), ns_prefix()) :: list()
   def get_schema_imports(wsdl, protocol_ns, schema_ns) do
     xpath(
       wsdl,
@@ -130,7 +133,7 @@ defmodule Soap.Wsdl do
     )
   end
 
-  @spec get_full_paths(String.t(), String.t(), String.t(), String.t(), String.t()) :: list(String.t())
+  @spec get_full_paths(xml_element(), String.t(), ns_prefix(), ns_prefix(), String.t()) :: list(String.t())
   defp get_full_paths(wsdl, path, protocol_ns, schema_namespace, endpoint) do
     wsdl
     |> get_schema_imports(protocol_ns, schema_namespace)
@@ -213,7 +216,7 @@ defmodule Soap.Wsdl do
     xpath(element, ~x"./#{ns("part", protocol_ns)}"l, name: ~x"./@name"s, element: ~x"./@element"s)
   end
 
-  @spec get_protocol_namespace(String.t()) :: String.t()
+  @spec get_protocol_namespace(xml_element()) :: ns_prefix()
   defp get_protocol_namespace(wsdl) do
     wsdl
     |> xpath(~x"//namespace::*"l)
@@ -221,7 +224,7 @@ defmodule Soap.Wsdl do
     |> elem(3)
   end
 
-  @spec get_soap_namespace(String.t(), list()) :: String.t()
+  @spec get_soap_namespace(xml_element(), list()) :: ns_prefix()
   defp get_soap_namespace(wsdl, opts) when is_list(opts) do
     version = soap_version(opts)
     namespace = @soap_version_namespaces[version]
@@ -232,7 +235,7 @@ defmodule Soap.Wsdl do
     |> elem(3)
   end
 
-  @spec get_schema_attributes(String.t()) :: map()
+  @spec get_schema_attributes(xml_element()) :: map()
   defp get_schema_attributes(wsdl) do
     case xpath(wsdl, ~x"//*[local-name() = 'schema']") do
       nil ->

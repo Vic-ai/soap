@@ -14,8 +14,13 @@ defmodule Soap.MixProject do
       deps: deps(),
       docs: docs(),
       package: package(),
-      test_coverage: [tool: ExCoveralls],
-      preferred_cli_env: [
+      test_coverage: [tool: ExCoveralls]
+    ]
+  end
+
+  def cli do
+    [
+      preferred_envs: [
         coveralls: :test,
         "coveralls.detail": :test,
         "coveralls.post": :test,
@@ -45,11 +50,12 @@ defmodule Soap.MixProject do
 
   defp deps do
     [
+      {:decimal, "~> 3.0"},
       {:sweet_xml, "~> 0.6"},
-      {:dialyxir, "~> 1.1.0", only: [:dev, :test], runtime: false},
+      {:dialyxir, "~> 1.4.7", only: [:dev, :test], runtime: false},
 
       # Http && XML
-      {:httpoison, "~> 1.3"},
+      {:httpoison, "~> 1.0 or ~> 2.0 or ~> 3.0"},
       {:xml_builder, "~> 2.1"},
       {:credo, "~> 1.0", only: [:dev, :test]},
       {:ex_doc, ">= 0.0.0", only: [:dev, :docs], runtime: false},
